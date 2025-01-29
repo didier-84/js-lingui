@@ -20,9 +20,11 @@ import { extractFromFiles } from "./catalog/extractFromFiles"
 import { FormatterWrapper, getFormat } from "./formats"
 
 export const fixture = (...dirs: string[]) =>
-  path.resolve(__dirname, path.join("fixtures", ...dirs)) +
-  // preserve trailing slash
-  (dirs[dirs.length - 1].endsWith("/") ? "/" : "")
+  (
+    path.resolve(__dirname, path.join("fixtures", ...dirs)) +
+    // preserve trailing slash
+    (dirs[dirs.length - 1].endsWith("/") ? "/" : "")
+  ).replace(/\\/g, "/")
 
 function mockConfig(config: Partial<LinguiConfig> = {}) {
   return makeConfig(
@@ -93,7 +95,7 @@ describe("Catalog", () => {
       // Everything should be empty
       expect(await catalog.readAll()).toMatchSnapshot()
 
-      await catalog.make({ ...defaultMakeOptions, locale: "en" })
+      await catalog.make({ ...defaultMakeOptions, locale: ["en"] })
       expect(await catalog.readAll()).toMatchSnapshot()
     })
 
@@ -214,6 +216,7 @@ describe("Catalog", () => {
                 15,
               ],
             ],
+            placeholders: {},
           },
         }
       `)
@@ -289,6 +292,28 @@ describe("Catalog", () => {
 
       const messages = await catalog.collect({
         files: [fixture("collect/componentA")],
+      })
+      expect(messages).toMatchSnapshot()
+    })
+
+    it("should extract files with special characters when passed in options", async () => {
+      const catalog = new Catalog(
+        {
+          name: "messages",
+          path: "locales/{locale}",
+          include: [fixture("collect")],
+          exclude: [],
+          format,
+        },
+        mockConfig()
+      )
+
+      const messages = await catalog.collect({
+        files: [
+          fixture("collect/(componentC)/index.js"),
+          fixture("collect/[componentD]/index.js"),
+          fixture("collect/$componentE/index.js"),
+        ],
       })
       expect(messages).toMatchSnapshot()
     })
@@ -503,7 +528,7 @@ describe("order", () => {
       }),
     }
 
-    const orderedCatalogs = order("messageId")(catalog)
+    const orderedCatalogs = order("messageId", catalog)
 
     // Test that the message content is the same as before
     expect(orderedCatalogs).toMatchSnapshot()
@@ -535,7 +560,7 @@ describe("order", () => {
       }),
     }
 
-    const orderedCatalogs = order("origin")(catalog)
+    const orderedCatalogs = order("origin", catalog)
 
     // Test that the message content is the same as before
     expect(orderedCatalogs).toMatchSnapshot()
@@ -571,7 +596,7 @@ describe("order", () => {
       }),
     }
 
-    const orderedCatalogs = order("message")(catalog)
+    const orderedCatalogs = order("message", catalog)
 
     // Jest snapshot order the keys automatically, so test that the key order explicitly
     expect(Object.keys(orderedCatalogs)).toMatchInlineSnapshot(`

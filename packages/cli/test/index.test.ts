@@ -3,7 +3,7 @@ import extractCommand from "../src/lingui-extract"
 import extractExperimentalCommand from "../src/lingui-extract-experimental"
 import { command as compileCommand } from "../src/lingui-compile"
 import fs from "fs/promises"
-import os from "os"
+import { sync } from "glob"
 import nodepath from "path"
 import { makeConfig } from "@lingui/conf"
 import { listingToHumanReadable, readFsToJson } from "../src/tests"
@@ -22,13 +22,18 @@ async function prepare(caseFolderName: string) {
 
   const actualPath = nodepath.join(rootDir, "actual")
   const expectedPath = nodepath.join(rootDir, "expected")
+  const existingPath = nodepath.join(rootDir, "existing")
 
   await fs.rm(actualPath, {
     recursive: true,
     force: true,
   })
 
-  return { rootDir, actualPath, expectedPath }
+  if (sync(existingPath).length === 1) {
+    await fs.cp(existingPath, actualPath, { recursive: true })
+  }
+
+  return { rootDir, actualPath, existingPath, expectedPath }
 }
 
 describe("E2E Extractor Test", () => {
@@ -69,12 +74,12 @@ describe("E2E Extractor Test", () => {
         ┌─────────────┬─────────────┬─────────┐
         │ Language    │ Total count │ Missing │
         ├─────────────┼─────────────┼─────────┤
-        │ en (source) │      8      │    -    │
-        │ pl          │      8      │    8    │
+        │ en (source) │     10      │    -    │
+        │ pl          │     10      │   10    │
         └─────────────┴─────────────┴─────────┘
 
-        (use "yarn extract" to update catalogs with new messages)
-        (use "yarn compile" to compile catalogs for production)
+        (Use "yarn extract" to update catalogs with new messages.)
+        (Use "yarn compile" to compile catalogs for production. Alternatively, use bundler plugins: https://lingui.dev/ref/cli#compiling-catalogs-in-ci)
       `)
     })
 
@@ -119,9 +124,7 @@ describe("E2E Extractor Test", () => {
     compareFolders(actualPath, expectedPath)
   })
 
-  const skipOnWindows = os.platform() === "win32" ? describe.skip : describe
-
-  skipOnWindows("extractor-experimental", () => {
+  describe("extractor-experimental", () => {
     it("should extract to template when --template passed", async () => {
       const { rootDir, actualPath, expectedPath } = await prepare(
         "extractor-experimental-template"
@@ -156,11 +159,11 @@ describe("E2E Extractor Test", () => {
           You have using an experimental feature
           Experimental features are not covered by semver, and may cause unexpected or broken application behavior. Use at your own risk.
 
-          Catalog statistics for fixtures/pages/about.page.tsx:
-          4 message(s) extracted
-
           Catalog statistics for fixtures/pages/index.page.ts:
           1 message(s) extracted
+
+          Catalog statistics for fixtures/pages/about.page.tsx:
+          4 message(s) extracted
 
           Compiling message catalogs…
         `)
@@ -172,12 +175,6 @@ describe("E2E Extractor Test", () => {
     it("should extract to catalogs and merge with existing", async () => {
       const { rootDir, actualPath, expectedPath } = await prepare(
         "extractor-experimental"
-      )
-
-      await fs.cp(
-        nodepath.join(rootDir, "existing"),
-        nodepath.join(rootDir, "actual"),
-        { recursive: true }
       )
 
       await mockConsole(async (console) => {
@@ -207,20 +204,20 @@ describe("E2E Extractor Test", () => {
           You have using an experimental feature
           Experimental features are not covered by semver, and may cause unexpected or broken application behavior. Use at your own risk.
 
-          Catalog statistics for fixtures/pages/about.page.ts:
-          ┌─────────────┬─────────────┬─────────┐
-          │ Language    │ Total count │ Missing │
-          ├─────────────┼─────────────┼─────────┤
-          │ en (source) │      2      │    -    │
-          │ pl          │      3      │    2    │
-          └─────────────┴─────────────┴─────────┘
-
           Catalog statistics for fixtures/pages/index.page.ts:
           ┌─────────────┬─────────────┬─────────┐
           │ Language    │ Total count │ Missing │
           ├─────────────┼─────────────┼─────────┤
-          │ en (source) │      1      │    -    │
-          │ pl          │      1      │    1    │
+          │ en (source) │      2      │    -    │
+          │ pl          │      2      │    2    │
+          └─────────────┴─────────────┴─────────┘
+
+          Catalog statistics for fixtures/pages/about.page.ts:
+          ┌─────────────┬─────────────┬─────────┐
+          │ Language    │ Total count │ Missing │
+          ├─────────────┼─────────────┼─────────┤
+          │ en (source) │      3      │    -    │
+          │ pl          │      4      │    3    │
           └─────────────┴─────────────┴─────────┘
 
           Compiling message catalogs…
@@ -232,12 +229,6 @@ describe("E2E Extractor Test", () => {
     it("should extract and clean obsolete", async () => {
       const { rootDir, actualPath, expectedPath } = await prepare(
         "extractor-experimental-clean"
-      )
-
-      await fs.cp(
-        nodepath.join(rootDir, "existing"),
-        nodepath.join(rootDir, "actual"),
-        { recursive: true }
       )
 
       await mockConsole(async (console) => {
@@ -266,14 +257,6 @@ describe("E2E Extractor Test", () => {
           You have using an experimental feature
           Experimental features are not covered by semver, and may cause unexpected or broken application behavior. Use at your own risk.
 
-          Catalog statistics for fixtures/pages/about.page.ts:
-          ┌─────────────┬─────────────┬─────────┐
-          │ Language    │ Total count │ Missing │
-          ├─────────────┼─────────────┼─────────┤
-          │ en (source) │      2      │    -    │
-          │ pl          │      3      │    2    │
-          └─────────────┴─────────────┴─────────┘
-
           Catalog statistics for fixtures/pages/index.page.ts:
           ┌─────────────┬─────────────┬─────────┐
           │ Language    │ Total count │ Missing │
@@ -282,10 +265,82 @@ describe("E2E Extractor Test", () => {
           │ pl          │      1      │    1    │
           └─────────────┴─────────────┴─────────┘
 
+          Catalog statistics for fixtures/pages/about.page.ts:
+          ┌─────────────┬─────────────┬─────────┐
+          │ Language    │ Total count │ Missing │
+          ├─────────────┼─────────────┼─────────┤
+          │ en (source) │      2      │    -    │
+          │ pl          │      3      │    2    │
+          └─────────────┴─────────────┴─────────┘
+
         `)
       })
 
       compareFolders(actualPath, expectedPath)
+    })
+  })
+
+  it("should extract consistently with files argument", async () => {
+    const { rootDir, actualPath, expectedPath } = await prepare(
+      "extract-partial-consistency"
+    )
+
+    await extractCommand(
+      makeConfig({
+        rootDir: rootDir,
+        locales: ["en"],
+        sourceLocale: "en",
+        format: "po",
+        catalogs: [
+          {
+            path: "<rootDir>/actual/{locale}",
+            include: ["<rootDir>/fixtures"],
+          },
+        ],
+      }),
+      {
+        files: [nodepath.join(rootDir, "fixtures", "file-b.tsx")],
+      }
+    )
+
+    compareFolders(actualPath, expectedPath)
+  })
+
+  it("Should not report statistics on pseudolocalizations", async () => {
+    const { rootDir } = await prepare("extract-po-format")
+
+    await mockConsole(async (console) => {
+      const result = await extractCommand(
+        makeConfig({
+          rootDir: rootDir,
+          locales: ["en", "pl", "pseudo-LOCALE"],
+          pseudoLocale: "pseudo-LOCALE",
+          sourceLocale: "en",
+          format: "po",
+          catalogs: [
+            {
+              path: "<rootDir>/actual/{locale}",
+              include: ["<rootDir>/fixtures"],
+            },
+          ],
+        }),
+        {}
+      )
+
+      expect(result).toBeTruthy()
+      expect(getConsoleMockCalls(console.error)).toBeFalsy()
+      expect(getConsoleMockCalls(console.log)).toMatchInlineSnapshot(`
+        Catalog statistics for actual/{locale}: 
+        ┌─────────────┬─────────────┬─────────┐
+        │ Language    │ Total count │ Missing │
+        ├─────────────┼─────────────┼─────────┤
+        │ en (source) │     10      │    -    │
+        │ pl          │     10      │   10    │
+        └─────────────┴─────────────┴─────────┘
+
+        (Use "yarn extract" to update catalogs with new messages.)
+        (Use "yarn compile" to compile catalogs for production. Alternatively, use bundler plugins: https://lingui.dev/ref/cli#compiling-catalogs-in-ci)
+      `)
     })
   })
 })

@@ -5,7 +5,7 @@ import { getConfig, LinguiConfigNormalized } from "@lingui/conf"
 
 import { getCatalogs } from "./api"
 import nodepath from "path"
-import { normalizeSlashes } from "./api/utils"
+import normalizePath from "normalize-path"
 
 export type CliExtractTemplateOptions = {
   verbose: boolean
@@ -18,7 +18,7 @@ export default async function command(
 ): Promise<boolean> {
   options.verbose && console.log("Extracting messages from source files…")
   const catalogs = await getCatalogs(config)
-  const catalogStats: { [path: string]: Number } = {}
+  const catalogStats: { [path: string]: number } = {}
 
   let commandSuccess = true
 
@@ -31,9 +31,7 @@ export default async function command(
 
       if (result) {
         catalogStats[
-          normalizeSlashes(
-            nodepath.relative(config.rootDir, catalog.templateFile)
-          )
+          normalizePath(nodepath.relative(config.rootDir, catalog.templateFile))
         ] = Object.keys(result).length
       }
       commandSuccess &&= Boolean(result)

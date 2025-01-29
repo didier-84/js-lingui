@@ -24,7 +24,7 @@ const USERS: UserDetails[] = [
   {
     logo: "ansible.png",
     name: "Ansible",
-    link: "https://github.com/ansible/awx",
+    link: "https://github.com/ansible/ansible-hub-ui",
   },
   {
     logo: "metamask.png",
@@ -32,9 +32,14 @@ const USERS: UserDetails[] = [
     link: "https://github.com/MetaMask/snaps-directory",
   },
   {
-    logo: "uniswap.png",
-    name: "Uniswap",
-    link: "https://github.com/Uniswap/interface",
+    logo: "twenty.png",
+    name: "Twenty",
+    link: "https://github.com/twentyhq/twenty",
+  },
+  {
+    logo: "documenso.png",
+    name: "Documenso",
+    link: "https://github.com/documenso/documenso",
   },
   {
     logo: "graysky.png",
@@ -78,7 +83,13 @@ const Users = (): React.ReactElement => {
           <h2>Loved by hundreds of teams, including:</h2>
           <div className={clsx("row", styles.usersList)}>
             {USERS.map((user, idx) => (
-              <a href={user.link} key={idx} target="_blank" rel="noreferrer" className={styles.user}>
+              <a
+                href={user.link}
+                key={idx}
+                target="_blank"
+                rel="noreferrer"
+                className={clsx(styles.user, "text--secondary")}
+              >
                 <img
                   className={clsx(styles.logo, "margin-bottom--sm")}
                   alt={user.name}
@@ -91,7 +102,7 @@ const Users = (): React.ReactElement => {
             ))}
           </div>
 
-          <p className={styles.muted}>And many more...</p>
+          <a href="/misc/showroom">And many more...</a>
         </div>
       </div>
     </section>

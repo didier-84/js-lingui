@@ -24,7 +24,6 @@ describe("Trans component", () => {
         "My name is {name}": "Jmenuji se {name}",
         Original: "Původní",
         Updated: "Aktualizovaný",
-        "msg.currency": "{value, number, currency}",
         ID: "Translation",
       },
     },
@@ -138,6 +137,38 @@ describe("Trans component", () => {
     })
   })
 
+  it("should follow jsx semantics regarding booleans", () => {
+    expect(
+      html(
+        <Trans
+          id="unknown"
+          message={"foo <0>{0}</0> bar"}
+          values={{
+            0: false,
+          }}
+          components={{
+            0: <span />,
+          }}
+        />
+      )
+    ).toEqual("foo <span></span> bar")
+
+    expect(
+      html(
+        <Trans
+          id="unknown"
+          message={"foo <0>{0}</0> bar"}
+          values={{
+            0: "lol",
+          }}
+          components={{
+            0: <span />,
+          }}
+        />
+      )
+    ).toEqual("foo <span>lol</span> bar")
+  })
+
   it("should render default string", () => {
     expect(text(<Trans id="unknown" />)).toEqual("unknown")
 
@@ -238,6 +269,30 @@ describe("Trans component", () => {
     expect(translation).toEqual(`Read <a href="/docs">the docs</a>`)
   })
 
+  it("should render nested elements with `asChild` pattern", () => {
+    const ComponentThatExpectsSingleElementChild: React.FC<{
+      asChild: boolean
+      children?: React.ReactElement
+    }> = (props) => {
+      if (props.asChild && React.isValidElement(props.children)) {
+        return props.children
+      }
+
+      return <div />
+    }
+
+    const translation = html(
+      <Trans
+        id="please <0><1>sign in again</1></0>"
+        components={{
+          0: <ComponentThatExpectsSingleElementChild asChild />,
+          1: <a href="/login" />,
+        }}
+      />
+    )
+    expect(translation).toEqual(`please <a href="/login">sign in again</a>`)
+  })
+
   it("should render translation inside custom component", () => {
     const Component = (props: PropsWithChildren) => (
       <p className="lead">{props.children}</p>
@@ -258,6 +313,7 @@ describe("Trans component", () => {
     const translation = text(
       <Trans
         id="msg.currency"
+        message="{value, number, currency}"
         values={{ value: 1 }}
         formats={{
           currency: {
@@ -269,6 +325,28 @@ describe("Trans component", () => {
       />
     )
     expect(translation).toEqual("1,00 €")
+  })
+
+  it("should render plural", () => {
+    const render = (count: number) =>
+      html(
+        <Trans
+          id={"tYX0sm"}
+          message={
+            "{count, plural, =0 {Zero items} one {# item} other {# <0>A lot of them</0>}}"
+          }
+          values={{
+            count,
+          }}
+          components={{
+            0: <a href="/more" />,
+          }}
+        />
+      )
+
+    expect(render(0)).toEqual("Zero items")
+    expect(render(1)).toEqual("1 item")
+    expect(render(2)).toEqual(`2 <a href="/more">A lot of them</a>`)
   })
 
   describe("rendering", () => {
@@ -305,7 +383,6 @@ describe("Trans component", () => {
         message: "Default",
         translation: "Translation",
         children: "Translation",
-        isTranslated: true,
       })
     })
 
@@ -369,7 +446,6 @@ describe("Trans component", () => {
       expect(element).toEqual(`<div id="Headline">value</div>`)
       expect(propsSpy).toHaveBeenCalledWith({
         id: "Headline",
-        isTranslated: false,
         message: undefined,
         translation: "Headline",
         children: "Headline",
@@ -388,8 +464,6 @@ describe("Trans component", () => {
         {props.translation && (
           <div data-testid="translation">{props.translation}</div>
         )}
-
-        <div data-testid="is-translated">{String(props.isTranslated)}</div>
       </>
     )
 
@@ -405,21 +479,6 @@ describe("Trans component", () => {
       expect(markup.queryByTestId("translation")?.innerHTML).toEqual(
         "Translation"
       )
-      expect(markup.queryByTestId("is-translated")?.innerHTML).toEqual("true")
-    })
-
-    it("should pass isTranslated: false if no translation", () => {
-      const markup = render(
-        <I18nProvider i18n={i18n} defaultComponent={DefaultComponent}>
-          <Trans id="NO_ID" message="Some message" />
-        </I18nProvider>
-      )
-
-      expect(markup.queryByTestId("id")?.innerHTML).toEqual("NO_ID")
-      expect(markup.queryByTestId("translation")?.innerHTML).toEqual(
-        "Some message"
-      )
-      expect(markup.queryByTestId("is-translated")?.innerHTML).toEqual("false")
     })
 
     describe("TransNoContext", () => {

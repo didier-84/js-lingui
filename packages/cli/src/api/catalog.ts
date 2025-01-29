@@ -1,7 +1,6 @@
 import fs from "fs"
 import path from "path"
-import * as R from "ramda"
-import glob from "glob"
+import { globSync } from "glob"
 import normalize from "normalize-path"
 
 import { LinguiConfigNormalized, OrderBy } from "@lingui/conf"
@@ -18,16 +17,12 @@ import { mergeCatalog } from "./catalog/mergeCatalog"
 import { extractFromFiles } from "./catalog/extractFromFiles"
 import {
   isDirectory,
+  makePathRegexSafe,
   normalizeRelativePath,
   replacePlaceholders,
   writeFile,
 } from "./utils"
-import {
-  AllCatalogsType,
-  CatalogType,
-  ExtractedCatalogType,
-  ExtractedMessageType,
-} from "./types"
+import { AllCatalogsType, CatalogType, ExtractedCatalogType } from "./types"
 
 const LOCALE = "{locale}"
 const LOCALE_SUFFIX_RE = /\{locale\}.*$/
@@ -94,18 +89,19 @@ export class Catalog {
     })
 
     // Map over all locales and post-process each catalog
-    const cleanAndSort = R.map(
-      R.pipe(
-        // Clean obsolete messages
-        (options.clean ? cleanObsolete : R.identity) as any,
-        // Sort messages
-        order(options.orderBy)
-      )
-    ) as unknown as (catalog: AllCatalogsType) => AllCatalogsType
+    const sortedCatalogs = Object.fromEntries(
+      Object.entries(catalogs).map(([locale, catalog]) => {
+        if (options.clean) {
+          catalog = cleanObsolete(catalog)
+        }
 
-    const sortedCatalogs = cleanAndSort(catalogs)
+        catalog = order(options.orderBy, catalog)
 
-    const locales = options.locale ? [options.locale] : this.locales
+        return [locale, catalog]
+      })
+    ) as AllCatalogsType
+
+    const locales = options.locale ? options.locale : this.locales
     await Promise.all(
       locales.map((locale) => this.write(locale, sortedCatalogs[locale]))
     )
@@ -118,7 +114,7 @@ export class Catalog {
   ): Promise<CatalogType | false> {
     const catalog = await this.collect({ files: options.files })
     if (!catalog) return false
-    const sorted = order<CatalogType>(options.orderBy)(catalog as CatalogType)
+    const sorted = order(options.orderBy, catalog as CatalogType)
 
     await this.writeTemplate(sorted)
     return sorted
@@ -132,9 +128,12 @@ export class Catalog {
   ): Promise<ExtractedCatalogType | undefined> {
     let paths = this.sourcePaths
     if (options.files) {
-      options.files = options.files.map((p) => normalize(p, false))
+      options.files = options.files.map((p) =>
+        makePathRegexSafe(normalize(p, false))
+      )
+
       const regex = new RegExp(options.files.join("|"), "i")
-      paths = paths.filter((path: string) => regex.test(path))
+      paths = paths.filter((path: string) => regex.test(normalize(path)))
     }
 
     return await extractFromFiles(paths, this.config)
@@ -165,14 +164,17 @@ export class Catalog {
     nextCatalog: ExtractedCatalogType,
     options: MergeOptions
   ) {
-    return R.mapObjIndexed((prevCatalog, locale) => {
-      return mergeCatalog(
-        prevCatalog,
-        nextCatalog,
-        this.config.sourceLocale === locale,
-        options
-      )
-    }, prevCatalogs)
+    return Object.fromEntries(
+      Object.entries(prevCatalogs).map(([locale, prevCatalog]) => [
+        locale,
+        mergeCatalog(
+          prevCatalog,
+          nextCatalog,
+          this.config.sourceLocale === locale,
+          options
+        ),
+      ])
+    )
   }
 
   async getTranslations(locale: string, options: GetTranslationsOptions) {
@@ -263,9 +265,7 @@ export class Catalog {
         : includePath
     })
 
-    const patterns =
-      includeGlobs.length > 1 ? `{${includeGlobs.join(",")}}` : includeGlobs[0]
-    return glob.sync(patterns, { ignore: this.exclude, mark: true })
+    return globSync(includeGlobs, { ignore: this.exclude, mark: true })
   }
 
   get localeDir() {
@@ -273,7 +273,7 @@ export class Catalog {
     if (localePatternIndex === -1) {
       throw Error(`Invalid catalog path: ${LOCALE} variable is missing`)
     }
-    return this.path.substr(0, localePatternIndex)
+    return this.path.substring(0, localePatternIndex)
   }
 
   get locales() {
@@ -285,20 +285,22 @@ function getTemplatePath(ext: string, path: string) {
   return path.replace(LOCALE_SUFFIX_RE, "messages" + ext)
 }
 
-export const cleanObsolete = R.filter(
-  (message: ExtractedMessageType) => !message.obsolete
-)
+export function cleanObsolete<T extends ExtractedCatalogType>(messages: T): T {
+  return Object.fromEntries(
+    Object.entries(messages).filter(([, message]) => !message.obsolete)
+  ) as T
+}
 
 export function order<T extends ExtractedCatalogType>(
-  by: OrderBy
-): (catalog: T) => T {
+  by: OrderBy,
+  catalog: T
+): T {
   return {
     messageId: orderByMessageId,
     message: orderByMessage,
     origin: orderByOrigin,
-  }[by]
+  }[by](catalog)
 }
-
 /**
  * Object keys are in the same order as they were created
  * https://stackoverflow.com/a/31102605/1535540

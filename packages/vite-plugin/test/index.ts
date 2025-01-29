@@ -2,41 +2,36 @@ import path from "path"
 import { exec as _exec } from "child_process"
 import { mkdtempSync } from "fs"
 import os from "os"
+import { platform } from "node:os"
 
-const skipOnWindows = os.platform() === "win32" ? it.skip : it
+const skipOnWindows = platform() === "win32" ? describe.skip : describe
 
-describe("vite-plugin", () => {
-  skipOnWindows("should return compiled catalog", async () => {
+skipOnWindows("vite-plugin", () => {
+  it("should return compiled catalog", async () => {
     const mod = await runVite(`po-format/vite.config.ts`)
     expect((await mod.load()).messages).toMatchSnapshot()
   })
 
-  skipOnWindows("should return compiled catalog json", async () => {
+  it("should return compiled catalog json", async () => {
     const mod = await runVite(`json-format/vite.config.ts`)
 
     expect((await mod.load()).messages).toMatchSnapshot()
   })
 
-  skipOnWindows(
-    "should report error when macro used without a plugin",
-    async () => {
-      expect.assertions(1)
-      try {
-        await runVite(`no-macro-error/vite.config.ts`)
-      } catch (e) {
-        expect(e.stderr).toContain(
-          'The macro you imported from "@lingui/macro" is being executed outside the context of compilation.'
-        )
-      }
+  it("should report error when macro used without a plugin", async () => {
+    expect.assertions(1)
+    try {
+      await runVite(`no-macro-error/vite.config.ts`)
+    } catch (e) {
+      expect(e.stderr).toContain(
+        'The macro you imported from "@lingui/core/macro" is being executed outside the context of compilation.'
+      )
     }
-  )
-  skipOnWindows(
-    "should not report error when macro correctly used",
-    async () => {
-      const mod = await runVite(`macro-usage/vite.config.ts`)
-      expect(await mod.load()).toMatchSnapshot()
-    }
-  )
+  })
+  it("should not report error when macro correctly used", async () => {
+    const mod = await runVite(`macro-usage/vite.config.ts`)
+    expect(await mod.load()).toMatchSnapshot()
+  })
 })
 
 async function runVite(configPath: string) {
@@ -53,6 +48,7 @@ async function runVite(configPath: string) {
     path.join(os.tmpdir(), `lingui-test-${process.pid}`)
   )
   const command =
+    "node " +
     viteExecutable +
     ` build -c ` +
     path.resolve(__dirname, configPath) +

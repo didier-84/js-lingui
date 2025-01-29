@@ -9,7 +9,8 @@ import { helpRun } from "./api/help"
 import { getCatalogs, getFormat } from "./api"
 import { TranslationMissingEvent } from "./api/catalog/getTranslationsForCatalog"
 import { getCatalogForMerge } from "./api/catalog/getCatalogs"
-import { normalizeSlashes } from "./api/utils"
+import normalizePath from "normalize-path"
+
 import nodepath from "path"
 
 export type CliCompileOptions = {
@@ -44,7 +45,11 @@ export async function command(
         },
       })
 
-      if (!options.allowEmpty && missingMessages.length > 0) {
+      if (
+        !options.allowEmpty &&
+        locale !== config.pseudoLocale &&
+        missingMessages.length > 0
+      ) {
         console.error(
           chalk.red(
             `Error: Failed to compile catalog for locale ${chalk.bold(locale)}!`
@@ -89,7 +94,7 @@ export async function command(
           namespace
         )
 
-        compiledPath = normalizeSlashes(
+        compiledPath = normalizePath(
           nodepath.relative(config.rootDir, compiledPath)
         )
 
@@ -113,7 +118,7 @@ export async function command(
         namespace
       )
 
-      compiledPath = normalizeSlashes(
+      compiledPath = normalizePath(
         nodepath.relative(config.rootDir, compiledPath)
       )
 
@@ -186,7 +191,7 @@ if (require.main === module) {
     return previousRun
   }
 
-  let debounceTimer: NodeJS.Timer
+  let debounceTimer: NodeJS.Timeout
 
   const dispatchCompile = () => {
     // Skip debouncing if not enabled

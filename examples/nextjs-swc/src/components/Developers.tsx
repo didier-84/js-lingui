@@ -1,5 +1,8 @@
+'use client'
+// this is a client component because it uses the `useState` hook
+
 import { useState } from 'react'
-import { Trans, Plural } from '@lingui/macro'
+import { Trans, Plural } from '@lingui/react/macro'
 
 export default function Developers() {
   const [selected, setSelected] = useState('1')
